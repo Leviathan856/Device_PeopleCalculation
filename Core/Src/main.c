@@ -129,11 +129,11 @@ void resetButtonState()
 {
 	if (buttonState)
 	{
-	  if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_RESET && (HAL_GetTick() - buttonChangeTime) > 50)
-	  {
+		if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_RESET && (HAL_GetTick() - buttonChangeTime) > 50)
+		{
 		  buttonState = 0;
 		  buttonChangeTime = HAL_GetTick();
-	  }
+		}
 	}
 }
 void buttonClick(int setLedState)
