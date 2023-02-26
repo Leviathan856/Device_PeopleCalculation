@@ -90,7 +90,7 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  int x;
+  int x = 0;
   uint32_t timestamp = HAL_GetTick();
   uint32_t buttonChangeTime = HAL_GetTick();
   int buttonState = 1;
@@ -100,36 +100,53 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_RESET && (HAL_GetTick() - buttonChangeTime) > 40)
+	  if (x == 0)
 	  {
-		  buttonState = 0;
-	  }
-	  if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_SET && !buttonState)
-	  {
-		  buttonState = 1;
-		  x = 1;
-		  buttonChangeTime = HAL_GetTick();
-		  while(x)
+		  if (buttonState)
 		  {
-			  if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_RESET && (HAL_GetTick() - buttonChangeTime) > 40)
+			  if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_RESET && (HAL_GetTick() - buttonChangeTime) > 50)
 			  {
 				  buttonState = 0;
+				  buttonChangeTime = HAL_GetTick();
 			  }
-			  if ((HAL_GetTick() - timestamp) > 250)
+	      }
+		  if (!buttonState)
+		  {
+			  if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_SET && (HAL_GetTick() - buttonChangeTime) > 50)
 			  {
-				  HAL_GPIO_TogglePin (GPIOC, GPIO_PIN_8);
-				  timestamp = HAL_GetTick();
+				  buttonState = 1;
+				  x = 1;
+				  buttonChangeTime = HAL_GetTick();
 			  }
-			  if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_SET && !buttonState)
+		  }
+	  }
+	  else
+	  {
+		  if ((HAL_GetTick() - timestamp) > 250)
+		  {
+			  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_8);
+			  timestamp = HAL_GetTick();
+		  }
+		  if (buttonState)
+		  {
+			  if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_RESET && (HAL_GetTick() - buttonChangeTime) > 50)
 			  {
-				  HAL_GPIO_WritePin (GPIOC, GPIO_PIN_8, GPIO_PIN_RESET);
+				  buttonState = 0;
+				  buttonChangeTime = HAL_GetTick();
+			  }
+	      }
+		  if (!buttonState)
+		  {
+			  if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_SET && (HAL_GetTick() - buttonChangeTime) > 50)
+			  {
+				  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET);
 				  buttonState = 1;
 				  x = 0;
 				  buttonChangeTime = HAL_GetTick();
 			  }
 		  }
 	  }
-  }
+}
   /* USER CODE END 3 */
 }
 

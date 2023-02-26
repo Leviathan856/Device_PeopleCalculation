@@ -68,6 +68,8 @@ void Error_Handler(void);
 #define SWCLK_Pin GPIO_PIN_14
 #define SWCLK_GPIO_Port GPIOA
 
+
+
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */
