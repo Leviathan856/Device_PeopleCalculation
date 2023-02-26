@@ -51,6 +51,8 @@ extern "C" {
 
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
+void resetButtonState();
+void buttonClick(int setLedState);
 
 /* USER CODE BEGIN EFP */
 
@@ -67,8 +69,6 @@ void Error_Handler(void);
 #define SWDIO_GPIO_Port GPIOA
 #define SWCLK_Pin GPIO_PIN_14
 #define SWCLK_GPIO_Port GPIOA
-
-
 
 /* USER CODE BEGIN Private defines */
 

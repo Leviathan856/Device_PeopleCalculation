@@ -60,6 +60,12 @@ static void MX_GPIO_Init(void);
   * @brief  The application entry point.
   * @retval int
   */
+
+int ledState;
+uint32_t timestamp;
+uint32_t buttonChangeTime;
+int buttonState;
+
 int main(void)
 {
   /* USER CODE BEGIN 1 */
@@ -90,35 +96,20 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  int x = 0;
-  uint32_t timestamp = HAL_GetTick();
-  uint32_t buttonChangeTime = HAL_GetTick();
-  int buttonState = 1;
+  ledState = 0;
+  timestamp = HAL_GetTick();
+  buttonChangeTime = HAL_GetTick();
+  buttonState = 1;
 
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  if (x == 0)
+	  if (ledState == 0)
 	  {
-		  if (buttonState)
-		  {
-			  if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_RESET && (HAL_GetTick() - buttonChangeTime) > 50)
-			  {
-				  buttonState = 0;
-				  buttonChangeTime = HAL_GetTick();
-			  }
-	      }
-		  if (!buttonState)
-		  {
-			  if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_SET && (HAL_GetTick() - buttonChangeTime) > 50)
-			  {
-				  buttonState = 1;
-				  x = 1;
-				  buttonChangeTime = HAL_GetTick();
-			  }
-		  }
+		  resetButtonState();
+		  buttonClick(1);
 	  }
 	  else
 	  {
@@ -127,27 +118,39 @@ int main(void)
 			  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_8);
 			  timestamp = HAL_GetTick();
 		  }
-		  if (buttonState)
-		  {
-			  if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_RESET && (HAL_GetTick() - buttonChangeTime) > 50)
-			  {
-				  buttonState = 0;
-				  buttonChangeTime = HAL_GetTick();
-			  }
-	      }
-		  if (!buttonState)
-		  {
-			  if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_SET && (HAL_GetTick() - buttonChangeTime) > 50)
-			  {
-				  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET);
-				  buttonState = 1;
-				  x = 0;
-				  buttonChangeTime = HAL_GetTick();
-			  }
-		  }
+		  resetButtonState();
+		  buttonClick(0);
 	  }
 }
   /* USER CODE END 3 */
+}
+
+void resetButtonState()
+{
+	if (buttonState)
+	{
+	  if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_RESET && (HAL_GetTick() - buttonChangeTime) > 50)
+	  {
+		  buttonState = 0;
+		  buttonChangeTime = HAL_GetTick();
+	  }
+	}
+}
+void buttonClick(int setLedState)
+{
+	if (!buttonState)
+	{
+		if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_SET && (HAL_GetTick() - buttonChangeTime) > 50)
+		{
+			if (!setLedState)
+			{
+				HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET);
+			}
+			buttonState = 1;
+			ledState = setLedState;
+			buttonChangeTime = HAL_GetTick();
+		}
+	}
 }
 
 /**
