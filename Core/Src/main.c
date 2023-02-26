@@ -91,33 +91,40 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   int x;
-  uint32_t timestamp;
+  uint32_t timestamp = HAL_GetTick();
+  int buttonState = 1;
+
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-
-	  if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_SET)
+	  if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_RESET)
+	  {
+		  buttonState = 0;
+	  }
+	  if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_SET && !buttonState)
 	  {
 		  x = 1;
-		  timestamp = HAL_GetTick();
-		  while ((HAL_GetTick() - timestamp) < 300) {}
+		  buttonState = 1;
 		  while(x)
 		  {
-			  if ((HAL_GetTick() - timestamp) > 300)
+			  if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_RESET)
+			  {
+				  buttonState = 0;
+			  }
+			  if ((HAL_GetTick() - timestamp) > 250)
 			  {
 				  timestamp = HAL_GetTick();
 				  HAL_GPIO_TogglePin (GPIOC, GPIO_PIN_8);
 			  }
-			  if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_SET)
+			  if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_SET && !buttonState)
 			  {
 				  HAL_GPIO_WritePin (GPIOC, GPIO_PIN_8, GPIO_PIN_RESET);
+				  buttonState = 1;
 				  x = 0;
 			  }
 		  }
-		  timestamp = HAL_GetTick();
-		  while ((HAL_GetTick() - timestamp) < 300) {}
 	  }
   }
   /* USER CODE END 3 */
