@@ -36,7 +36,8 @@ extern "C" {
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
-
+typedef enum {Blinking = 1, Off = 0} LedStates;
+typedef enum {Pressed = 1, Released = 0} ButtonStates;
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
@@ -52,8 +53,7 @@ extern "C" {
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
 void resetButtonState();
-void buttonClick(int setLedState);
-
+void buttonClick(LedStates setLedState);
 /* USER CODE BEGIN EFP */
 
 /* USER CODE END EFP */
@@ -69,6 +69,10 @@ void buttonClick(int setLedState);
 #define SWDIO_GPIO_Port GPIOA
 #define SWCLK_Pin GPIO_PIN_14
 #define SWCLK_GPIO_Port GPIOA
+
+#define DEBOUNCE_DELAY 50
+#define LED_BLINK_PERIOD 250
+#define CURRENT_TIME HAL_GetTick()
 
 /* USER CODE BEGIN Private defines */
 

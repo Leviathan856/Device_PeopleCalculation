@@ -61,10 +61,11 @@ static void MX_GPIO_Init(void);
   * @retval int
   */
 
-int ledState;
+LedStates ledState = Off;
+ButtonStates buttonState = Released;
+
 uint32_t timestamp;
 uint32_t buttonChangeTime;
-int buttonState;
 
 int main(void)
 {
@@ -96,30 +97,28 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  ledState = 0;
-  timestamp = HAL_GetTick();
-  buttonChangeTime = HAL_GetTick();
-  buttonState = 1;
+  timestamp = CURRENT_TIME;
+  buttonChangeTime = CURRENT_TIME;
 
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  if (ledState == 0)
+	  if (ledState == Off)
 	  {
 		  resetButtonState();
-		  buttonClick(1);
+		  buttonClick(Blinking);
 	  }
 	  else
 	  {
-		  if ((HAL_GetTick() - timestamp) > 250)
+		  if ((CURRENT_TIME - timestamp) > LED_BLINK_PERIOD)
 		  {
 			  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_8);
-			  timestamp = HAL_GetTick();
+			  timestamp = CURRENT_TIME;
 		  }
 		  resetButtonState();
-		  buttonClick(0);
+		  buttonClick(Off);
 	  }
 }
   /* USER CODE END 3 */
@@ -127,28 +126,28 @@ int main(void)
 
 void resetButtonState()
 {
-	if (buttonState)
+	if (buttonState == Pressed)
 	{
-		if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_RESET && (HAL_GetTick() - buttonChangeTime) > 50)
+		if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_RESET && (CURRENT_TIME - buttonChangeTime) > DEBOUNCE_DELAY)
 		{
-		  buttonState = 0;
-		  buttonChangeTime = HAL_GetTick();
+		  buttonState = Released;
+		  buttonChangeTime = CURRENT_TIME;
 		}
 	}
 }
-void buttonClick(int setLedState)
+void buttonClick(LedStates setLedState)
 {
-	if (!buttonState)
+	if (buttonState == Released)
 	{
-		if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_SET && (HAL_GetTick() - buttonChangeTime) > 50)
+		if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_SET && (CURRENT_TIME - buttonChangeTime) > DEBOUNCE_DELAY)
 		{
-			if (!setLedState)
+			if (setLedState == Off)
 			{
 				HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET);
 			}
-			buttonState = 1;
+			buttonState = Pressed;
 			ledState = setLedState;
-			buttonChangeTime = HAL_GetTick();
+			buttonChangeTime = CURRENT_TIME;
 		}
 	}
 }
