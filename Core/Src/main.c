@@ -40,10 +40,9 @@
 
 /* Private variables ---------------------------------------------------------*/
 UART_HandleTypeDef huart1;
-uint8_t byte;
 
 /* USER CODE BEGIN PV */
-
+uint8_t message[100] = "Hi!\r\n";
 
 /* USER CODE END PV */
 
@@ -90,27 +89,30 @@ int main(void)
   MX_GPIO_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-
+  __HAL_UART_ENABLE_IT(&huart1, UART_IT_RXNE);
+  __HAL_UART_ENABLE_IT(&huart1, UART_IT_TC);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
-  HAL_UART_Transmit(&huart1, (uint8_t*)("a"), 1, 100);
-//  HAL_StatusTypeDef sd = HAL_UART_Receive_IT(&huart1, &byte, 1);
-  uint32_t timestamp = HAL_GetTick();
+  HAL_UART_Transmit(&huart1, message, 1, 100);
+  for (uint8_t i = 0; i < sizeof(message) - 1; i++)
+   {
+ 	  message[i] = NULL;
+   }
+  HAL_StatusTypeDef rxState = HAL_UART_Receive_IT(&huart1, message, 100);
 
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  HAL_UART_Receive(&huart1, &byte, 1, 500);
-	  if (HAL_GetTick() - timestamp > 600)
+	  if (rxState == HAL_OK)
 	  {
-		  HAL_UART_Transmit(&huart1, &byte, 1, 100);
-		  timestamp = HAL_GetTick();
+		  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_8);
 	  }
+	  HAL_Delay(500);
   }
   /* USER CODE END 3 */
 }
@@ -176,7 +178,7 @@ static void MX_USART1_UART_Init(void)
 
   /* USER CODE END USART1_Init 1 */
   huart1.Instance = USART1;
-  huart1.Init.BaudRate = 38400;
+  huart1.Init.BaudRate = 115200;
   huart1.Init.WordLength = UART_WORDLENGTH_8B;
   huart1.Init.StopBits = UART_STOPBITS_1;
   huart1.Init.Parity = UART_PARITY_NONE;
@@ -211,11 +213,11 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOC, LD4_Pin|LD3_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : PA0 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  /*Configure GPIO pin : Blue_Button_Pin */
+  GPIO_InitStruct.Pin = Blue_Button_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  HAL_GPIO_Init(Blue_Button_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : LD4_Pin */
   GPIO_InitStruct.Pin = LD4_Pin;

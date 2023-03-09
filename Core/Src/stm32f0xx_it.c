@@ -26,7 +26,7 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN TD */
-
+extern uint8_t message[100];
 /* USER CODE END TD */
 
 /* Private define ------------------------------------------------------------*/
@@ -55,7 +55,7 @@
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
-
+extern UART_HandleTypeDef huart1;
 /* USER CODE BEGIN EV */
 
 /* USER CODE END EV */
@@ -139,6 +139,25 @@ void SysTick_Handler(void)
 /* For the available peripheral interrupt handler names,                      */
 /* please refer to the startup file (startup_stm32f0xx.s).                    */
 /******************************************************************************/
+
+/**
+  * @brief This function handles USART1 global interrupt / USART1 wake-up interrupt through EXTI line 25.
+  */
+void USART1_IRQHandler(void)
+{
+  /* USER CODE BEGIN USART1_IRQn 0 */
+
+  /* USER CODE END USART1_IRQn 0 */
+  HAL_UART_IRQHandler(&huart1);
+  /* USER CODE BEGIN USART1_IRQn 1 */
+  HAL_UART_Transmit(&huart1, message, sizeof(message), 1000);
+  for (uint8_t i = 0; i < sizeof(message) - 1; i++)
+  {
+	  message[i] = NULL;
+  }
+  HAL_UART_Receive_IT(&huart1, message, sizeof(message));
+  /* USER CODE END USART1_IRQn 1 */
+}
 
 /* USER CODE BEGIN 1 */
 
