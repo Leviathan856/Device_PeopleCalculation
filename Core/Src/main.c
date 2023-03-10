@@ -42,7 +42,7 @@
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-uint8_t message[100] = "Hi!\r\n";
+uint8_t RxData[100] = "Hi!\r\n";
 
 /* USER CODE END PV */
 
@@ -91,17 +91,14 @@ int main(void)
   /* USER CODE BEGIN 2 */
   __HAL_UART_ENABLE_IT(&huart1, UART_IT_RXNE);
   __HAL_UART_ENABLE_IT(&huart1, UART_IT_TC);
+
+  HAL_UART_Transmit(&huart1, RxData, sizeof(RxData), 1000);
+//  ClearBuffer(RxData, sizeof(RxData));
+  HAL_StatusTypeDef rxState = HAL_UARTEx_ReceiveToIdle_IT(&huart1, RxData, sizeof(RxData));
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-
-  HAL_UART_Transmit(&huart1, message, 1, 100);
-  for (uint8_t i = 0; i < sizeof(message) - 1; i++)
-   {
- 	  message[i] = NULL;
-   }
-  HAL_StatusTypeDef rxState = HAL_UART_Receive_IT(&huart1, message, 100);
 
   while (1)
   {
@@ -112,7 +109,7 @@ int main(void)
 	  {
 		  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_8);
 	  }
-	  HAL_Delay(500);
+	  HAL_Delay(600);
   }
   /* USER CODE END 3 */
 }
@@ -236,6 +233,29 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void ClearBuffer(uint8_t *buffer, uint8_t size)
+{
+	for (uint8_t i = 0; i < size - 1; i++)
+		buffer[i] = '\0';
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+	if (huart->Instance == USART1)
+	{
+	    HAL_UART_Transmit_IT(&huart1, RxData, sizeof(RxData));
+	    HAL_UART_Receive_IT(&huart1, RxData, sizeof(RxData));
+	}
+}
+
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
+{
+	if (huart->Instance == USART1)
+	{
+		HAL_UART_Transmit_IT(&huart1, RxData, Size);
+		HAL_UARTEx_ReceiveToIdle_IT(&huart1, RxData, sizeof(RxData));
+	}
+}
 
 /* USER CODE END 4 */
 

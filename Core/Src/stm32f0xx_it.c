@@ -26,7 +26,7 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN TD */
-extern uint8_t message[100];
+extern uint8_t RxData[100];
 /* USER CODE END TD */
 
 /* Private define ------------------------------------------------------------*/
@@ -150,12 +150,7 @@ void USART1_IRQHandler(void)
   /* USER CODE END USART1_IRQn 0 */
   HAL_UART_IRQHandler(&huart1);
   /* USER CODE BEGIN USART1_IRQn 1 */
-  HAL_UART_Transmit(&huart1, message, sizeof(message), 1000);
-  for (uint8_t i = 0; i < sizeof(message) - 1; i++)
-  {
-	  message[i] = NULL;
-  }
-  HAL_UART_Receive_IT(&huart1, message, sizeof(message));
+
   /* USER CODE END USART1_IRQn 1 */
 }
 
