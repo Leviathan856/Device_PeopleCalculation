@@ -26,7 +26,7 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN TD */
-extern uint8_t RxData[100];
+
 /* USER CODE END TD */
 
 /* Private define ------------------------------------------------------------*/

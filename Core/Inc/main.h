@@ -69,7 +69,9 @@ void ClearBuffer(uint8_t *buffer, uint8_t size);
 #define SWCLK_GPIO_Port GPIOA
 
 /* USER CODE BEGIN Private defines */
-
+#define BUFFER_SIZE 100
+#define LED_BLINK_DELAY 600
+#define TRANSMISSION_TIMEOUT 1000
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
