@@ -53,12 +53,12 @@ extern "C" {
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
-
+void ClearBuffer(uint8_t *buffer, uint8_t size);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define B1_Pin GPIO_PIN_0
-#define B1_GPIO_Port GPIOA
+#define Blue_Button_Pin GPIO_PIN_0
+#define Blue_Button_GPIO_Port GPIOA
 #define LD4_Pin GPIO_PIN_8
 #define LD4_GPIO_Port GPIOC
 #define LD3_Pin GPIO_PIN_9
@@ -69,7 +69,9 @@ void Error_Handler(void);
 #define SWCLK_GPIO_Port GPIOA
 
 /* USER CODE BEGIN Private defines */
-
+#define BUFFER_SIZE 100
+#define LED_BLINK_DELAY 600
+#define TRANSMISSION_TIMEOUT 1000
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
