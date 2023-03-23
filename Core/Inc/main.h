@@ -53,7 +53,7 @@ extern "C" {
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
-void ClearBuffer(uint8_t *buffer, uint8_t size);
+
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
@@ -70,7 +70,8 @@ void ClearBuffer(uint8_t *buffer, uint8_t size);
 
 /* USER CODE BEGIN Private defines */
 #define BUFFER_SIZE 100
-#define LED_BLINK_DELAY 600
+#define LED_BLINK_DELAY 500
+#define LED_BLINK_ERROR_DELAY 200
 #define TRANSMISSION_TIMEOUT 1000
 /* USER CODE END Private defines */
 

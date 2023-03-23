@@ -18,10 +18,11 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "cmsis_os.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "freertos.c"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -41,15 +42,45 @@
 /* Private variables ---------------------------------------------------------*/
 UART_HandleTypeDef huart1;
 
+/* Definitions for UART_Com */
+osThreadId_t UART_ComHandle;
+const osThreadAttr_t UART_Com_attributes = {
+  .name = "UART_Com",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
+/* Definitions for LED_Blink */
+osThreadId_t LED_BlinkHandle;
+const osThreadAttr_t LED_Blink_attributes = {
+  .name = "LED_Blink",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityLow,
+};
+/* Definitions for myQueue01 */
+osMessageQueueId_t myQueue01Handle;
+const osMessageQueueAttr_t myQueue01_attributes = {
+  .name = "myQueue01"
+};
+/* Definitions for myTimer01 */
+osTimerId_t myTimer01Handle;
+const osTimerAttr_t myTimer01_attributes = {
+  .name = "myTimer01"
+};
 /* USER CODE BEGIN PV */
-uint8_t RxData[BUFFER_SIZE] = "Hi!\r\n";
 
+
+HAL_StatusTypeDef rxState;
+uint8_t RxData[BUFFER_SIZE] = "Hi!\r\n";
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
+void StartUART(void *argument);
+void StartLEDBlink(void *argument);
+void Callback01(void *argument);
+
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -91,25 +122,61 @@ int main(void)
   /* USER CODE BEGIN 2 */
   __HAL_UART_ENABLE_IT(&huart1, UART_IT_RXNE);
   __HAL_UART_ENABLE_IT(&huart1, UART_IT_TC);
-
-  HAL_UART_Transmit(&huart1, RxData, sizeof(RxData), TRANSMISSION_TIMEOUT);
-//  ClearBuffer(RxData, sizeof(RxData));
-  HAL_StatusTypeDef rxState = HAL_UARTEx_ReceiveToIdle_IT(&huart1, RxData, sizeof(RxData));
   /* USER CODE END 2 */
 
+  /* Init scheduler */
+  osKernelInitialize();
+
+  /* USER CODE BEGIN RTOS_MUTEX */
+  /* add mutexes, ... */
+  /* USER CODE END RTOS_MUTEX */
+
+  /* USER CODE BEGIN RTOS_SEMAPHORES */
+  /* add semaphores, ... */
+  /* USER CODE END RTOS_SEMAPHORES */
+
+  /* Create the timer(s) */
+  /* creation of myTimer01 */
+  myTimer01Handle = osTimerNew(Callback01, osTimerPeriodic, NULL, &myTimer01_attributes);
+
+  /* USER CODE BEGIN RTOS_TIMERS */
+  /* start timers, add new ones, ... */
+  /* USER CODE END RTOS_TIMERS */
+
+  /* Create the queue(s) */
+  /* creation of myQueue01 */
+  myQueue01Handle = osMessageQueueNew (16, sizeof(uint16_t), &myQueue01_attributes);
+
+  /* USER CODE BEGIN RTOS_QUEUES */
+  /* add queues, ... */
+  /* USER CODE END RTOS_QUEUES */
+
+  /* Create the thread(s) */
+  /* creation of UART_Com */
+  UART_ComHandle = osThreadNew(StartUART, NULL, &UART_Com_attributes);
+
+  /* creation of LED_Blink */
+  LED_BlinkHandle = osThreadNew(StartLEDBlink, NULL, &LED_Blink_attributes);
+
+  /* USER CODE BEGIN RTOS_THREADS */
+  /* add threads, ... */
+  /* USER CODE END RTOS_THREADS */
+
+  /* USER CODE BEGIN RTOS_EVENTS */
+  /* add events, ... */
+  /* USER CODE END RTOS_EVENTS */
+
+  /* Start scheduler */
+  osKernelStart();
+
+  /* We should never get here as control is now taken by the scheduler */
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  if (rxState == HAL_OK)
-	  {
-		  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_8);
-	  }
-	  HAL_Delay(LED_BLINK_DELAY);
   }
   /* USER CODE END 3 */
 }
@@ -233,30 +300,95 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-void ClearBuffer(uint8_t *buffer, uint8_t size)
-{
-	memset(buffer, '\0', size);
-}
-
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
-{
-	if (huart->Instance == USART1)
-	{
-	    HAL_UART_Transmit_IT(&huart1, RxData, sizeof(RxData));
-	    HAL_UART_Receive_IT(&huart1, RxData, sizeof(RxData));
-	}
-}
-
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
 	if (huart->Instance == USART1)
 	{
-		HAL_UART_Transmit_IT(&huart1, RxData, Size);
+		rxState = HAL_UART_Transmit_IT(&huart1, RxData, Size);
 		HAL_UARTEx_ReceiveToIdle_IT(&huart1, RxData, sizeof(RxData));
 	}
 }
-
 /* USER CODE END 4 */
+
+/* USER CODE BEGIN Header_StartUART */
+/**
+  * @brief  Function implementing the UART_Com thread.
+  * @param  argument: Not used
+  * @retval None
+  */
+/* USER CODE END Header_StartUART */
+void StartUART(void *argument)
+{
+  /* USER CODE BEGIN 5 */
+  rxState = HAL_UART_Transmit(&huart1, RxData, sizeof(RxData), TRANSMISSION_TIMEOUT);
+  HAL_UARTEx_ReceiveToIdle_IT(&huart1, RxData, sizeof(RxData));
+  /* Infinite loop */
+  for(;;)
+  {
+	if (rxState != HAL_OK)	// Check if UART is working
+	{
+		osThreadSuspend(LED_BlinkHandle);	// Suspend led blinking if UART communication fails
+		HAL_GPIO_WritePin (GPIOC, GPIO_PIN_8, GPIO_PIN_RESET);
+	}
+	else
+	{
+		if (eTaskGetState(LED_BlinkHandle) == eSuspended)
+		{
+			osThreadResume(LED_BlinkHandle);	// Resume led blinking if UART is working
+		}
+	}
+    osDelay(LED_BLINK_DELAY);
+  }
+  /* USER CODE END 5 */
+}
+
+/* USER CODE BEGIN Header_StartLEDBlink */
+/**
+* @brief Function implementing the LED_Blink thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartLEDBlink */
+void StartLEDBlink(void *argument)
+{
+  /* USER CODE BEGIN StartLEDBlink */
+  /* Infinite loop */
+  for(;;)
+  {
+	  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_8);	// Blink blue led
+	  osDelay(LED_BLINK_DELAY);
+  }
+  /* USER CODE END StartLEDBlink */
+}
+
+/* Callback01 function */
+void Callback01(void *argument)
+{
+  /* USER CODE BEGIN Callback01 */
+
+  /* USER CODE END Callback01 */
+}
+
+/**
+  * @brief  Period elapsed callback in non blocking mode
+  * @note   This function is called  when TIM6 interrupt took place, inside
+  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+  * a global variable "uwTick" used as application time base.
+  * @param  htim : TIM handle
+  * @retval None
+  */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  /* USER CODE BEGIN Callback 0 */
+
+  /* USER CODE END Callback 0 */
+  if (htim->Instance == TIM6) {
+    HAL_IncTick();
+  }
+  /* USER CODE BEGIN Callback 1 */
+
+  /* USER CODE END Callback 1 */
+}
 
 /**
   * @brief  This function is executed in case of error occurrence.
