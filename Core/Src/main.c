@@ -56,16 +56,6 @@ const osThreadAttr_t LED_Blink_attributes = {
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityLow,
 };
-/* Definitions for myQueue01 */
-osMessageQueueId_t myQueue01Handle;
-const osMessageQueueAttr_t myQueue01_attributes = {
-  .name = "myQueue01"
-};
-/* Definitions for myTimer01 */
-osTimerId_t myTimer01Handle;
-const osTimerAttr_t myTimer01_attributes = {
-  .name = "myTimer01"
-};
 /* USER CODE BEGIN PV */
 
 
@@ -79,7 +69,6 @@ static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
 void StartUART(void *argument);
 void StartLEDBlink(void *argument);
-void Callback01(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -135,17 +124,9 @@ int main(void)
   /* add semaphores, ... */
   /* USER CODE END RTOS_SEMAPHORES */
 
-  /* Create the timer(s) */
-  /* creation of myTimer01 */
-  myTimer01Handle = osTimerNew(Callback01, osTimerPeriodic, NULL, &myTimer01_attributes);
-
   /* USER CODE BEGIN RTOS_TIMERS */
   /* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
-
-  /* Create the queue(s) */
-  /* creation of myQueue01 */
-  myQueue01Handle = osMessageQueueNew (16, sizeof(uint16_t), &myQueue01_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
@@ -327,17 +308,17 @@ void StartUART(void *argument)
   {
 	if (rxState != HAL_OK)	// Check if UART is working
 	{
-		osThreadSuspend(LED_BlinkHandle);	// Suspend led blinking if UART communication fails
+		vTaskSuspend(LED_BlinkHandle);	// Suspend led blinking if UART communication fails
 		HAL_GPIO_WritePin (GPIOC, GPIO_PIN_8, GPIO_PIN_RESET);
 	}
 	else
 	{
 		if (eTaskGetState(LED_BlinkHandle) == eSuspended)
 		{
-			osThreadResume(LED_BlinkHandle);	// Resume led blinking if UART is working
+			xTaskResumeFromISR(LED_BlinkHandle);	// Resume led blinking if UART is working
 		}
 	}
-    osDelay(LED_BLINK_DELAY);
+    vTaskDelay(LED_BLINK_DELAY);
   }
   /* USER CODE END 5 */
 }
@@ -356,17 +337,9 @@ void StartLEDBlink(void *argument)
   for(;;)
   {
 	  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_8);	// Blink blue led
-	  osDelay(LED_BLINK_DELAY);
+	  vTaskDelay(LED_BLINK_DELAY);
   }
   /* USER CODE END StartLEDBlink */
-}
-
-/* Callback01 function */
-void Callback01(void *argument)
-{
-  /* USER CODE BEGIN Callback01 */
-
-  /* USER CODE END Callback01 */
 }
 
 /**
