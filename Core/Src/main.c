@@ -46,21 +46,31 @@ UART_HandleTypeDef huart1;
 osThreadId_t UART_ComHandle;
 const osThreadAttr_t UART_Com_attributes = {
   .name = "UART_Com",
-  .stack_size = 128 * 4,
+  .stack_size = 128 * 3,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for LED_Blink */
 osThreadId_t LED_BlinkHandle;
 const osThreadAttr_t LED_Blink_attributes = {
   .name = "LED_Blink",
-  .stack_size = 128 * 4,
+  .stack_size = 128 * 3,
   .priority = (osPriority_t) osPriorityLow,
+};
+/* Definitions for IRSensor */
+osThreadId_t IRSensorHandle;
+const osThreadAttr_t IRSensor_attributes = {
+  .name = "IRSensor",
+  .stack_size = 128 * 3,
+  .priority = (osPriority_t) osPriorityHigh,
 };
 /* USER CODE BEGIN PV */
 
 
 HAL_StatusTypeDef rxState;
 uint8_t RxData[BUFFER_SIZE] = "Hi!\r\n";
+GPIO_PinState ps = GPIO_PIN_SET;;
+uint8_t sensorMessage[30] = "Object detected!\r\n";
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -69,6 +79,7 @@ static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
 void StartUART(void *argument);
 void StartLEDBlink(void *argument);
+void StartIRSensor(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -138,6 +149,9 @@ int main(void)
 
   /* creation of LED_Blink */
   LED_BlinkHandle = osThreadNew(StartLEDBlink, NULL, &LED_Blink_attributes);
+
+  /* creation of IRSensor */
+  IRSensorHandle = osThreadNew(StartIRSensor, NULL, &IRSensor_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -252,11 +266,17 @@ static void MX_GPIO_Init(void)
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOC, LD4_Pin|LD3_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : PC0 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pin : Blue_Button_Pin */
   GPIO_InitStruct.Pin = Blue_Button_Pin;
@@ -336,10 +356,43 @@ void StartLEDBlink(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_8);	// Blink blue led
-	  vTaskDelay(LED_BLINK_DELAY);
+	HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_8);	// Blink blue led
+	vTaskDelay(LED_BLINK_DELAY);
   }
   /* USER CODE END StartLEDBlink */
+}
+
+/* USER CODE BEGIN Header_StartIRSensor */
+/**
+* @brief Function implementing the IRSensor thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartIRSensor */
+void StartIRSensor(void *argument)
+{
+  /* USER CODE BEGIN StartIRSensor */
+  /* Infinite loop */
+  for(;;)
+  {
+	if (ps == GPIO_PIN_RESET)
+	{
+		if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_0) == GPIO_PIN_SET)
+		{
+			ps = GPIO_PIN_SET;
+		}
+	}
+	else
+	{
+		ps = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_0);
+		if (ps == GPIO_PIN_RESET)
+		{
+			HAL_UART_Transmit_IT(&huart1, sensorMessage, sizeof(sensorMessage));
+		}
+	}
+	vTaskDelay(SENSOR_STATE_CHECK);
+	}
+	/* USER CODE END StartIRSensor  */
 }
 
 /**

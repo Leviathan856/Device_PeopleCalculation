@@ -71,7 +71,7 @@ void Error_Handler(void);
 /* USER CODE BEGIN Private defines */
 #define BUFFER_SIZE 100
 #define LED_BLINK_DELAY 500
-#define LED_BLINK_ERROR_DELAY 200
+#define SENSOR_STATE_CHECK 250
 #define TRANSMISSION_TIMEOUT 1000
 /* USER CODE END Private defines */
 
