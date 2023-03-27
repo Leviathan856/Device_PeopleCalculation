@@ -66,9 +66,9 @@ const osThreadAttr_t IRSensor_attributes = {
 /* USER CODE BEGIN PV */
 
 
-HAL_StatusTypeDef rxState;
-uint8_t RxData[BUFFER_SIZE] = "Hi!\r\n";
-GPIO_PinState ps = GPIO_PIN_SET;;
+HAL_StatusTypeDef uartState;
+uint8_t uartDataBuffer[BUFFER_SIZE] = "Hi!\r\n";
+GPIO_PinState sensorState = GPIO_PIN_SET;;
 uint8_t sensorMessage[30] = "Object detected!\r\n";
 
 /* USER CODE END PV */
@@ -305,8 +305,20 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
 	if (huart->Instance == USART1)
 	{
-		rxState = HAL_UART_Transmit_IT(&huart1, RxData, Size);
-		HAL_UARTEx_ReceiveToIdle_IT(&huart1, RxData, sizeof(RxData));
+		HAL_UART_Transmit_IT(&huart1, uartDataBuffer, Size);
+		HAL_UARTEx_ReceiveToIdle_IT(&huart1, uartDataBuffer, sizeof(uartDataBuffer));
+		uartState = HAL_OK;
+	}
+}
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
+{
+
+}
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
+{
+	if (huart->Instance == USART1)
+	{
+		uartState = HAL_ERROR;
 	}
 }
 /* USER CODE END 4 */
@@ -321,12 +333,12 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 void StartUART(void *argument)
 {
   /* USER CODE BEGIN 5 */
-  rxState = HAL_UART_Transmit(&huart1, RxData, sizeof(RxData), TRANSMISSION_TIMEOUT);
-  HAL_UARTEx_ReceiveToIdle_IT(&huart1, RxData, sizeof(RxData));
+  HAL_UART_Transmit(&huart1, uartDataBuffer, sizeof(uartDataBuffer), TRANSMISSION_TIMEOUT);
+  HAL_UARTEx_ReceiveToIdle_IT(&huart1, uartDataBuffer, sizeof(uartDataBuffer));
   /* Infinite loop */
   for(;;)
   {
-	if (rxState != HAL_OK)	// Check if UART is working
+	if (uartState != HAL_OK)	// Check if UART is working
 	{
 		vTaskSuspend(LED_BlinkHandle);	// Suspend led blinking if UART communication fails
 		HAL_GPIO_WritePin (GPIOC, GPIO_PIN_8, GPIO_PIN_RESET);
@@ -375,17 +387,17 @@ void StartIRSensor(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	if (ps == GPIO_PIN_RESET)
+	if (sensorState == GPIO_PIN_RESET)
 	{
 		if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_0) == GPIO_PIN_SET)
 		{
-			ps = GPIO_PIN_SET;
+			sensorState = GPIO_PIN_SET;
 		}
 	}
 	else
 	{
-		ps = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_0);
-		if (ps == GPIO_PIN_RESET)
+		sensorState = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_0);
+		if (sensorState == GPIO_PIN_RESET)
 		{
 			HAL_UART_Transmit_IT(&huart1, sensorMessage, sizeof(sensorMessage));
 		}
