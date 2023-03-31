@@ -22,7 +22,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "freertos.c"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -46,21 +46,21 @@ UART_HandleTypeDef huart1;
 osThreadId_t UART_ComHandle;
 const osThreadAttr_t UART_Com_attributes = {
   .name = "UART_Com",
-  .stack_size = 128 * 3,
+  .stack_size = 64 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for LED_Blink */
 osThreadId_t LED_BlinkHandle;
 const osThreadAttr_t LED_Blink_attributes = {
   .name = "LED_Blink",
-  .stack_size = 128 * 3,
+  .stack_size = 64 * 4,
   .priority = (osPriority_t) osPriorityLow,
 };
 /* Definitions for IRSensor */
 osThreadId_t IRSensorHandle;
 const osThreadAttr_t IRSensor_attributes = {
   .name = "IRSensor",
-  .stack_size = 128 * 3,
+  .stack_size = 64 * 4,
   .priority = (osPriority_t) osPriorityHigh,
 };
 /* USER CODE BEGIN PV */
@@ -68,8 +68,15 @@ const osThreadAttr_t IRSensor_attributes = {
 
 HAL_StatusTypeDef uartState;
 uint8_t uartDataBuffer[BUFFER_SIZE] = "Hi!\r\n";
-GPIO_PinState sensorState = GPIO_PIN_SET;;
-uint8_t sensorMessage[30] = "Object detected!\r\n";
+GPIO_PinState sensorState = GPIO_PIN_SET;
+GPIO_PinState sensor1State = GPIO_PIN_SET;
+GPIO_PinState sensor2State = GPIO_PIN_SET;
+uint8_t sensorMessage[SENSOR_MESSAGE_SIZE] = "Object detected!\r\n";
+uint8_t sensorMessageIn[SENSOR_MESSAGE_SIZE] = "Object IN!\r\n";
+uint8_t sensorMessageOut[SENSOR_MESSAGE_SIZE] = "Object OUT!\r\n";
+uint32_t sensor1Timestamp;
+uint32_t sensor2Timestamp;
+
 
 /* USER CODE END PV */
 
@@ -272,17 +279,11 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOC, LD4_Pin|LD3_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : PC0 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  /*Configure GPIO pins : IR_Sensor_1_Pin IR_Sensor_2_Pin */
+  GPIO_InitStruct.Pin = IR_Sensor_1_Pin|IR_Sensor_2_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : Blue_Button_Pin */
-  GPIO_InitStruct.Pin = Blue_Button_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(Blue_Button_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : LD4_Pin */
   GPIO_InitStruct.Pin = LD4_Pin;
@@ -297,6 +298,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   HAL_GPIO_Init(LD3_GPIO_Port, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI0_1_IRQn, 3, 0);
+  HAL_NVIC_EnableIRQ(EXTI0_1_IRQn);
 
 }
 
@@ -321,6 +326,19 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 		uartState = HAL_ERROR;
 	}
 }
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_0) == GPIO_PIN_RESET)
+	{
+      sensor1State = GPIO_PIN_RESET;
+      sensor1Timestamp = HAL_GetTick();
+	}
+	if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_1) == GPIO_PIN_RESET)
+	{
+      sensor2State = GPIO_PIN_RESET;
+      sensor2Timestamp = HAL_GetTick();
+	}
+}
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartUART */
@@ -340,17 +358,17 @@ void StartUART(void *argument)
   {
 	if (uartState != HAL_OK)	// Check if UART is working
 	{
-		vTaskSuspend(LED_BlinkHandle);	// Suspend led blinking if UART communication fails
+		osThreadSuspend(LED_BlinkHandle);	// Suspend led blinking if UART communication fails
 		HAL_GPIO_WritePin (GPIOC, GPIO_PIN_8, GPIO_PIN_RESET);
 	}
 	else
 	{
-		if (eTaskGetState(LED_BlinkHandle) == eSuspended)
+		if (osThreadGetState(LED_BlinkHandle) != osThreadRunning)
 		{
-			xTaskResumeFromISR(LED_BlinkHandle);	// Resume led blinking if UART is working
+			osThreadResume(LED_BlinkHandle);	// Resume led blinking if UART is working
 		}
 	}
-    vTaskDelay(LED_BLINK_DELAY);
+    osDelay(LED_BLINK_DELAY);
   }
   /* USER CODE END 5 */
 }
@@ -369,7 +387,7 @@ void StartLEDBlink(void *argument)
   for(;;)
   {
 	HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_8);	// Blink blue led
-	vTaskDelay(LED_BLINK_DELAY);
+	osDelay(LED_BLINK_DELAY);
   }
   /* USER CODE END StartLEDBlink */
 }
@@ -387,24 +405,30 @@ void StartIRSensor(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	if (sensorState == GPIO_PIN_RESET)
-	{
-		if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_0) == GPIO_PIN_SET)
-		{
-			sensorState = GPIO_PIN_SET;
-		}
-	}
-	else
-	{
-		sensorState = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_0);
-		if (sensorState == GPIO_PIN_RESET)
-		{
-			HAL_UART_Transmit_IT(&huart1, sensorMessage, sizeof(sensorMessage));
-		}
-	}
-	vTaskDelay(SENSOR_STATE_CHECK);
-	}
-	/* USER CODE END StartIRSensor  */
+    if (sensor1State == GPIO_PIN_RESET && sensor2State == GPIO_PIN_RESET)
+    {
+      if (sensor1Timestamp >= sensor2Timestamp)
+      {
+        sensor1Timestamp = sensor1Timestamp - sensor2Timestamp;
+        if (sensor1Timestamp <= WALKTHROUGH_INTERVAL)
+        {
+          HAL_UART_Transmit_IT(&huart1, sensorMessageIn, SENSOR_MESSAGE_SIZE);
+        }
+      }
+      else
+      {
+        sensor1Timestamp = sensor2Timestamp - sensor1Timestamp;
+        if (sensor1Timestamp <= WALKTHROUGH_INTERVAL)
+        {
+          HAL_UART_Transmit_IT(&huart1, sensorMessageOut, SENSOR_MESSAGE_SIZE);
+        }
+      }
+      sensor1State = GPIO_PIN_SET;
+      sensor2State = GPIO_PIN_SET;  
+    }
+	osDelay(SENSOR_STATE_CHECK);
+  }
+  /* USER CODE END StartIRSensor */
 }
 
 /**
