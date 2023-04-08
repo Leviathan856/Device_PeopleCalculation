@@ -57,8 +57,12 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define Blue_Button_Pin GPIO_PIN_0
-#define Blue_Button_GPIO_Port GPIOA
+#define IR_Sensor_1_Pin GPIO_PIN_0
+#define IR_Sensor_1_GPIO_Port GPIOC
+#define IR_Sensor_1_EXTI_IRQn EXTI0_1_IRQn
+#define IR_Sensor_2_Pin GPIO_PIN_1
+#define IR_Sensor_2_GPIO_Port GPIOC
+#define IR_Sensor_2_EXTI_IRQn EXTI0_1_IRQn
 #define LD4_Pin GPIO_PIN_8
 #define LD4_GPIO_Port GPIOC
 #define LD3_Pin GPIO_PIN_9
@@ -70,9 +74,11 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN Private defines */
 #define BUFFER_SIZE 100
+#define SENSOR_MESSAGE_SIZE 20
 #define LED_BLINK_DELAY 500
-#define SENSOR_STATE_CHECK 250
+#define SENSOR_STATE_CHECK 100
 #define TRANSMISSION_TIMEOUT 1000
+#define WALKTHROUGH_INTERVAL 2000
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
