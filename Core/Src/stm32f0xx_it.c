@@ -103,18 +103,32 @@ void HardFault_Handler(void)
 /******************************************************************************/
 
 /**
-  * @brief This function handles EXTI line 0 and 1 interrupts.
+  * @brief This function handles PVD interrupt through EXTI Line16.
   */
-void EXTI0_1_IRQHandler(void)
+void PVD_IRQHandler(void)
 {
-  /* USER CODE BEGIN EXTI0_1_IRQn 0 */
+  /* USER CODE BEGIN PVD_IRQn 0 */
 
-  /* USER CODE END EXTI0_1_IRQn 0 */
+  /* USER CODE END PVD_IRQn 0 */
+  HAL_PWR_PVD_IRQHandler();
+  /* USER CODE BEGIN PVD_IRQn 1 */
+
+  /* USER CODE END PVD_IRQn 1 */
+}
+
+/**
+  * @brief This function handles EXTI line 2 and 3 interrupts.
+  */
+void EXTI2_3_IRQHandler(void)
+{
+  /* USER CODE BEGIN EXTI2_3_IRQn 0 */
+
+  /* USER CODE END EXTI2_3_IRQn 0 */
   HAL_GPIO_EXTI_IRQHandler(IR_Sensor_1_Pin);
   HAL_GPIO_EXTI_IRQHandler(IR_Sensor_2_Pin);
-  /* USER CODE BEGIN EXTI0_1_IRQn 1 */
+  /* USER CODE BEGIN EXTI2_3_IRQn 1 */
 
-  /* USER CODE END EXTI0_1_IRQn 1 */
+  /* USER CODE END EXTI2_3_IRQn 1 */
 }
 
 /**

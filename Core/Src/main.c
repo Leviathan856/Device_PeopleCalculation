@@ -22,7 +22,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <string.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -63,11 +63,21 @@ const osThreadAttr_t IRSensor_attributes = {
   .stack_size = 64 * 4,
   .priority = (osPriority_t) osPriorityHigh,
 };
+/* Definitions for FlashMemCheck */
+osThreadId_t FlashMemCheckHandle;
+const osThreadAttr_t FlashMemCheck_attributes = {
+  .name = "FlashMemCheck",
+  .stack_size = 64 * 4,
+  .priority = (osPriority_t) osPriorityLow,
+};
 /* USER CODE BEGIN PV */
 
 
 HAL_StatusTypeDef uartState;
-uint8_t uartDataBuffer[BUFFER_SIZE] = "Hi!\r\n";
+uint8_t uartBuffer[BUFFER_SIZE] = "Hi!\r\n";
+uint32_t flashBuffer[4];
+uint32_t peopleInCount = 0;
+uint32_t peopleOutCount = 0;
 GPIO_PinState sensorState = GPIO_PIN_SET;
 GPIO_PinState sensor1State = GPIO_PIN_SET;
 GPIO_PinState sensor2State = GPIO_PIN_SET;
@@ -76,7 +86,8 @@ uint8_t sensorMessageIn[SENSOR_MESSAGE_SIZE] = "Object IN!\r\n";
 uint8_t sensorMessageOut[SENSOR_MESSAGE_SIZE] = "Object OUT!\r\n";
 uint32_t sensor1Timestamp;
 uint32_t sensor2Timestamp;
-
+FLASH_EraseInitTypeDef EraseInitStruct;
+uint32_t PageError;
 
 /* USER CODE END PV */
 
@@ -87,9 +98,14 @@ static void MX_USART1_UART_Init(void);
 void StartUART(void *argument);
 void StartLEDBlink(void *argument);
 void StartIRSensor(void *argument);
+void StartMemoryCheck(void *argument);
 
 /* USER CODE BEGIN PFP */
-
+uint32_t FlashEraseData(FLASH_EraseInitTypeDef EraseInitStruct, uint32_t PageError);
+uint32_t FlashWriteData(uint32_t startPageAddress, uint32_t *data, uint16_t wordsNumber);
+void FlashReadData(uint32_t startPageAddress, uint32_t *rxBuffer, uint16_t wordsNumber);
+void ConvertToStr(uint32_t num, char* buf);
+void ConvertToStr2(uint32_t num1, uint32_t num2, char* buf);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -129,6 +145,10 @@ int main(void)
   /* USER CODE BEGIN 2 */
   __HAL_UART_ENABLE_IT(&huart1, UART_IT_RXNE);
   __HAL_UART_ENABLE_IT(&huart1, UART_IT_TC);
+
+  EraseInitStruct.TypeErase = FLASH_TYPEERASE_PAGES;
+  EraseInitStruct.PageAddress = USER_DATA_START_PAGE_ADDRESS;
+  EraseInitStruct.NbPages = 1;
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -160,6 +180,9 @@ int main(void)
   /* creation of IRSensor */
   IRSensorHandle = osThreadNew(StartIRSensor, NULL, &IRSensor_attributes);
 
+  /* creation of FlashMemCheck */
+  FlashMemCheckHandle = osThreadNew(StartMemoryCheck, NULL, &FlashMemCheck_attributes);
+
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
@@ -170,7 +193,6 @@ int main(void)
 
   /* Start scheduler */
   osKernelStart();
-
   /* We should never get here as control is now taken by the scheduler */
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
@@ -271,6 +293,8 @@ static void MX_USART1_UART_Init(void)
 static void MX_GPIO_Init(void)
 {
   GPIO_InitTypeDef GPIO_InitStruct = {0};
+/* USER CODE BEGIN MX_GPIO_Init_1 */
+/* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
@@ -284,6 +308,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : Blue_PushButton_Pin */
+  GPIO_InitStruct.Pin = Blue_PushButton_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_EVT_RISING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(Blue_PushButton_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : LD4_Pin */
   GPIO_InitStruct.Pin = LD4_Pin;
@@ -300,9 +330,11 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(LD3_GPIO_Port, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI0_1_IRQn, 3, 0);
-  HAL_NVIC_EnableIRQ(EXTI0_1_IRQn);
+  HAL_NVIC_SetPriority(EXTI2_3_IRQn, 3, 0);
+  HAL_NVIC_EnableIRQ(EXTI2_3_IRQn);
 
+/* USER CODE BEGIN MX_GPIO_Init_2 */
+/* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
@@ -310,14 +342,10 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
 	if (huart->Instance == USART1)
 	{
-		HAL_UART_Transmit_IT(&huart1, uartDataBuffer, Size);
-		HAL_UARTEx_ReceiveToIdle_IT(&huart1, uartDataBuffer, sizeof(uartDataBuffer));
+		HAL_UART_Transmit_IT(&huart1, uartBuffer, Size);
+		HAL_UARTEx_ReceiveToIdle_IT(&huart1, uartBuffer, sizeof(uartBuffer));
 		uartState = HAL_OK;
 	}
-}
-void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
-{
-
 }
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
@@ -328,17 +356,117 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 }
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-	if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_0) == GPIO_PIN_RESET)
+	if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_2) == GPIO_PIN_RESET)
 	{
       sensor1State = GPIO_PIN_RESET;
       sensor1Timestamp = HAL_GetTick();
 	}
-	if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_1) == GPIO_PIN_RESET)
+	if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_3) == GPIO_PIN_RESET)
 	{
       sensor2State = GPIO_PIN_RESET;
       sensor2Timestamp = HAL_GetTick();
 	}
 }
+uint32_t FlashEraseData(FLASH_EraseInitTypeDef EraseInitStruct, uint32_t PageError)
+{
+	HAL_FLASH_Unlock();
+	if (HAL_FLASHEx_Erase(&EraseInitStruct, &PageError) != HAL_OK)
+	{
+		return HAL_FLASH_GetError();
+	}
+	HAL_FLASH_Lock();
+	return 0;
+}
+uint32_t FlashWriteData(uint32_t startPageAddress, uint32_t *data, uint16_t wordsNumber)
+{
+	HAL_FLASH_Unlock();
+	FlashEraseData(EraseInitStruct, PageError);
+    for (uint16_t count = 0; count < wordsNumber; count++)
+    {
+    	if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, startPageAddress, data[count]) == HAL_OK)
+    	{
+    		startPageAddress += FLASH_MEMORY_WORD_SIZE;
+    	}
+    	else
+    	{
+    		return HAL_FLASH_GetError();
+        }
+    }
+
+    HAL_FLASH_Lock();
+    return 0;
+}
+
+void FlashReadData(uint32_t startPageAddress, uint32_t *rxBuffer, uint16_t wordsNumber)
+{
+	for (; wordsNumber > 0; wordsNumber--)
+	{
+		*rxBuffer = *(__IO uint32_t *)startPageAddress;
+		startPageAddress += FLASH_MEMORY_WORD_SIZE;
+		rxBuffer++;
+	}
+}
+
+void ConvertToStr(uint32_t num, char* buf)
+{
+    int i = 2;
+    int len = strlen(buf);
+    int temp;
+
+    buf[0] = '\n';
+    buf[1] = '\r';
+    while (num != 0)
+    {
+        int rem = num % 10;
+        buf[i++] = rem + '0';
+        num /= 10;
+    }
+    buf[i] = '\0';
+
+    for (int j = 0; j < len/2; j++)
+    {
+        temp = buf[j];
+        buf[j] = buf[len - j - 1];
+        buf[len - j - 1] = temp;
+    }
+}
+void ConvertToStr2(uint32_t num1, uint32_t num2, char* buf)
+{
+    int i = 2;
+    int len = strlen(buf);
+    int temp, rem;
+
+    buf[0] = '\n';
+    buf[1] = '\r';
+    while (num2 != 0)
+    {
+        rem = num2 % 10;
+        buf[i++] = rem + '0';
+        num2 /= 10;
+    }
+    while (num1 != 0)
+	{
+		rem = num1 % 10;
+		buf[i++] = rem + '0';
+		num1 /= 10;
+	}
+    buf[i] = '\0';
+
+    for (int j = 0; j < len/2; j++)
+    {
+        temp = buf[j];
+        buf[j] = buf[len - j - 1];
+        buf[len - j - 1] = temp;
+    }
+}
+void updateBuffer(uint32_t *buffer)
+{
+	buffer[0] = 1;
+	buffer[1] = peopleInCount;
+	buffer[2] = peopleOutCount;
+	buffer[3] = 2;
+}
+
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartUART */
@@ -351,8 +479,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 void StartUART(void *argument)
 {
   /* USER CODE BEGIN 5 */
-  HAL_UART_Transmit(&huart1, uartDataBuffer, sizeof(uartDataBuffer), TRANSMISSION_TIMEOUT);
-  HAL_UARTEx_ReceiveToIdle_IT(&huart1, uartDataBuffer, sizeof(uartDataBuffer));
+  HAL_UART_Transmit(&huart1, uartBuffer, sizeof(uartBuffer), TRANSMISSION_TIMEOUT);
+  HAL_UARTEx_ReceiveToIdle_IT(&huart1, uartBuffer, sizeof(uartBuffer));
   /* Infinite loop */
   for(;;)
   {
@@ -407,28 +535,60 @@ void StartIRSensor(void *argument)
   {
     if (sensor1State == GPIO_PIN_RESET && sensor2State == GPIO_PIN_RESET)
     {
-      if (sensor1Timestamp >= sensor2Timestamp)
+      if (sensor1Timestamp > sensor2Timestamp)
       {
         sensor1Timestamp = sensor1Timestamp - sensor2Timestamp;
         if (sensor1Timestamp <= WALKTHROUGH_INTERVAL)
         {
           HAL_UART_Transmit_IT(&huart1, sensorMessageIn, SENSOR_MESSAGE_SIZE);
+          peopleInCount++;
         }
       }
-      else
+      if (sensor1Timestamp < sensor2Timestamp)
       {
         sensor1Timestamp = sensor2Timestamp - sensor1Timestamp;
         if (sensor1Timestamp <= WALKTHROUGH_INTERVAL)
         {
           HAL_UART_Transmit_IT(&huart1, sensorMessageOut, SENSOR_MESSAGE_SIZE);
+          peopleOutCount++;
         }
       }
       sensor1State = GPIO_PIN_SET;
-      sensor2State = GPIO_PIN_SET;  
+      sensor2State = GPIO_PIN_SET;
+      updateBuffer(flashBuffer);
+	  FlashWriteData(USER_DATA_START_PAGE_ADDRESS, flashBuffer, 4);
     }
 	osDelay(SENSOR_STATE_CHECK);
   }
   /* USER CODE END StartIRSensor */
+}
+
+/* USER CODE BEGIN Header_StartMemoryCheck */
+/**
+* @brief Function implementing the FlashMemCheck thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartMemoryCheck */
+void StartMemoryCheck(void *argument)
+{
+  /* USER CODE BEGIN StartMemoryCheck */
+  FlashReadData(USER_DATA_START_PAGE_ADDRESS, (uint32_t *)flashBuffer, 4);
+  if (flashBuffer[0] != 1 || flashBuffer[3] != 2)
+  {
+	  FlashEraseData(EraseInitStruct, PageError);
+	  updateBuffer(flashBuffer);
+	  FlashWriteData(USER_DATA_START_PAGE_ADDRESS, flashBuffer, 4);
+  }
+  /* Infinite loop */
+  for(;;)
+  {
+	  FlashReadData(USER_DATA_START_PAGE_ADDRESS, flashBuffer, 4);
+   	  ConvertToStr2(flashBuffer[1], flashBuffer[2], uartBuffer);
+	  HAL_UART_Transmit_IT(&huart1, uartBuffer, sizeof(uartBuffer));
+      osDelay(5000);
+  }
+  /* USER CODE END StartMemoryCheck */
 }
 
 /**
