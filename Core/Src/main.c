@@ -104,8 +104,7 @@ void StartMemoryCheck(void *argument);
 uint32_t FlashEraseData(FLASH_EraseInitTypeDef EraseInitStruct, uint32_t PageError);
 uint32_t FlashWriteData(uint32_t startPageAddress, uint32_t *data, uint16_t wordsNumber);
 void FlashReadData(uint32_t startPageAddress, uint32_t *rxBuffer, uint16_t wordsNumber);
-void ConvertToStr(uint32_t num, char* buf);
-void ConvertToStr2(uint32_t num1, uint32_t num2, char* buf);
+void ConvertToStr(uint32_t num1, uint32_t num2, uint8_t* buf);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -338,6 +337,10 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+///=========================================================================
+/// @brief Function for transmiting echo message via UART
+///=========================================================================
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
 	if (huart->Instance == USART1)
@@ -347,6 +350,10 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 		uartState = HAL_OK;
 	}
 }
+
+///=========================================================================
+/// @brief Function for tracking UART errors
+///=========================================================================
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
 	if (huart->Instance == USART1)
@@ -354,6 +361,10 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 		uartState = HAL_ERROR;
 	}
 }
+
+///=========================================================================
+/// @brief Function for sensor interrupt callback
+///=========================================================================
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
 	if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_2) == GPIO_PIN_RESET)
@@ -367,6 +378,11 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
       sensor2Timestamp = HAL_GetTick();
 	}
 }
+
+///=========================================================================
+/// @brief Function for erasing specific data page in flash memory
+/// @return result (success == 0)
+///=========================================================================
 uint32_t FlashEraseData(FLASH_EraseInitTypeDef EraseInitStruct, uint32_t PageError)
 {
 	HAL_FLASH_Unlock();
@@ -377,6 +393,11 @@ uint32_t FlashEraseData(FLASH_EraseInitTypeDef EraseInitStruct, uint32_t PageErr
 	HAL_FLASH_Lock();
 	return 0;
 }
+
+///=========================================================================
+/// @brief Function for writing data to specific data page in flash memory
+/// @return result (success == 0)
+///=========================================================================
 uint32_t FlashWriteData(uint32_t startPageAddress, uint32_t *data, uint16_t wordsNumber)
 {
 	HAL_FLASH_Unlock();
@@ -390,13 +411,15 @@ uint32_t FlashWriteData(uint32_t startPageAddress, uint32_t *data, uint16_t word
     	else
     	{
     		return HAL_FLASH_GetError();
-        }
+      }
     }
-
     HAL_FLASH_Lock();
     return 0;
 }
 
+///=========================================================================
+/// @brief Function for reading data from specific data page in flash memory
+///=========================================================================
 void FlashReadData(uint32_t startPageAddress, uint32_t *rxBuffer, uint16_t wordsNumber)
 {
 	for (; wordsNumber > 0; wordsNumber--)
@@ -407,34 +430,15 @@ void FlashReadData(uint32_t startPageAddress, uint32_t *rxBuffer, uint16_t words
 	}
 }
 
-void ConvertToStr(uint32_t num, char* buf)
+///=========================================================================
+/// @brief Function for converting 2 integer values to string 
+///        and writing the string in buffer
+///=========================================================================
+void ConvertToStr(uint32_t num1, uint32_t num2, uint8_t* buf)
 {
-    int i = 2;
-    int len = strlen(buf);
-    int temp;
-
-    buf[0] = '\n';
-    buf[1] = '\r';
-    while (num != 0)
-    {
-        int rem = num % 10;
-        buf[i++] = rem + '0';
-        num /= 10;
-    }
-    buf[i] = '\0';
-
-    for (int j = 0; j < len/2; j++)
-    {
-        temp = buf[j];
-        buf[j] = buf[len - j - 1];
-        buf[len - j - 1] = temp;
-    }
-}
-void ConvertToStr2(uint32_t num1, uint32_t num2, char* buf)
-{
-    int i = 2;
-    int len = strlen(buf);
-    int temp, rem;
+    uint32_t i = 2;
+    uint32_t len = strlen(buf);
+    uint32_t temp, rem;
 
     buf[0] = '\n';
     buf[1] = '\r';
@@ -445,11 +449,11 @@ void ConvertToStr2(uint32_t num1, uint32_t num2, char* buf)
         num2 /= 10;
     }
     while (num1 != 0)
-	{
-		rem = num1 % 10;
-		buf[i++] = rem + '0';
-		num1 /= 10;
-	}
+	  {
+		  rem = num1 % 10;
+		  buf[i++] = rem + '0';
+		  num1 /= 10;
+	  }
     buf[i] = '\0';
 
     for (int j = 0; j < len/2; j++)
@@ -459,6 +463,10 @@ void ConvertToStr2(uint32_t num1, uint32_t num2, char* buf)
         buf[len - j - 1] = temp;
     }
 }
+
+///=========================================================================
+/// @brief Function for updating buffer with key words and data from sensor
+///=========================================================================
 void updateBuffer(uint32_t *buffer)
 {
 	buffer[0] = 1;
@@ -555,10 +563,18 @@ void StartIRSensor(void *argument)
       }
       sensor1State = GPIO_PIN_SET;
       sensor2State = GPIO_PIN_SET;
-      updateBuffer(flashBuffer);
-	  FlashWriteData(USER_DATA_START_PAGE_ADDRESS, flashBuffer, 4);
+      
+      if (flashBuffer[0] == USER_DATA_START_MAGIC_WORD &&
+          flashBuffer[3] == USER_DATA_END_MAGIC_WORD)
+      {
+        if (flashBuffer[1] % 10 == 0 || flashBuffer[2] % 10 == 0)
+        {
+          HAL_UART_Transmit_IT(&huart1, uartBuffer, sizeof(uartBuffer));
+        }
+      }
+
     }
-	osDelay(SENSOR_STATE_CHECK);
+	  osDelay(SENSOR_STATE_CHECK);
   }
   /* USER CODE END StartIRSensor */
 }
@@ -574,19 +590,31 @@ void StartMemoryCheck(void *argument)
 {
   /* USER CODE BEGIN StartMemoryCheck */
   FlashReadData(USER_DATA_START_PAGE_ADDRESS, (uint32_t *)flashBuffer, 4);
-  if (flashBuffer[0] != 1 || flashBuffer[3] != 2)
+  if (flashBuffer[0] != USER_DATA_START_MAGIC_WORD ||
+      flashBuffer[3] != USER_DATA_END_MAGIC_WORD)
   {
 	  FlashEraseData(EraseInitStruct, PageError);
 	  updateBuffer(flashBuffer);
 	  FlashWriteData(USER_DATA_START_PAGE_ADDRESS, flashBuffer, 4);
   }
+  else
+  {
+    peopleInCount = flashBuffer[1];
+    peopleOutCount = flashBuffer[2];
+  }
   /* Infinite loop */
   for(;;)
   {
-	  FlashReadData(USER_DATA_START_PAGE_ADDRESS, flashBuffer, 4);
-   	  ConvertToStr2(flashBuffer[1], flashBuffer[2], uartBuffer);
-	  HAL_UART_Transmit_IT(&huart1, uartBuffer, sizeof(uartBuffer));
-      osDelay(5000);
+    updateBuffer(flashBuffer);
+	  FlashWriteData(USER_DATA_START_PAGE_ADDRESS, flashBuffer, 4);
+    memset(flashBuffer, '\0', sizeof(flashBuffer));
+
+	  if (peopleInCount != 0 && peopleInCount != 0)
+    {
+      FlashReadData(USER_DATA_START_PAGE_ADDRESS, flashBuffer, 4);
+     	ConvertToStr(flashBuffer[1], flashBuffer[2], uartBuffer);
+    }
+    osDelay(5000);
   }
   /* USER CODE END StartMemoryCheck */
 }

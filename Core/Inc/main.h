@@ -84,7 +84,8 @@ void Error_Handler(void);
 
 #define USER_DATA_START_PAGE_ADDRESS ((uint32_t)0x0800FC00)
 #define FLASH_MEMORY_WORD_SIZE 4
-#define atoa(x) #x
+#define USER_DATA_START_MAGIC_WORD 1
+#define USER_DATA_END_MAGIC_WORD 2
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
