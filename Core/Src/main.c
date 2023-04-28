@@ -72,7 +72,6 @@ const osThreadAttr_t FlashMemCheck_attributes = {
 };
 /* USER CODE BEGIN PV */
 
-
 HAL_StatusTypeDef uartState;
 uint8_t uartBuffer[BUFFER_SIZE] = "Hi!\r\n";
 uint32_t flashBuffer[4];
@@ -84,10 +83,13 @@ GPIO_PinState sensor2State = GPIO_PIN_SET;
 uint8_t sensorMessage[SENSOR_MESSAGE_SIZE] = "Object detected!\r\n";
 uint8_t sensorMessageIn[SENSOR_MESSAGE_SIZE] = "Object IN!\r\n";
 uint8_t sensorMessageOut[SENSOR_MESSAGE_SIZE] = "Object OUT!\r\n";
+uint8_t messageBrownOUT[SENSOR_MESSAGE_SIZE] = "Brownout detected!\r\n";
 uint32_t sensor1Timestamp;
 uint32_t sensor2Timestamp;
 FLASH_EraseInitTypeDef EraseInitStruct;
 uint32_t PageError;
+
+USER_DATA_EVENTS dataEvent = Transmitted;
 
 /* USER CODE END PV */
 
@@ -105,6 +107,9 @@ uint32_t FlashEraseData(FLASH_EraseInitTypeDef EraseInitStruct, uint32_t PageErr
 uint32_t FlashWriteData(uint32_t startPageAddress, uint32_t *data, uint16_t wordsNumber);
 void FlashReadData(uint32_t startPageAddress, uint32_t *rxBuffer, uint16_t wordsNumber);
 void ConvertToStr(uint32_t num1, uint32_t num2, uint8_t* buf);
+void updateBuffer(uint32_t* buffer);
+void Init_PVD();
+void HAL_PWR_PVDCallback();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -144,6 +149,8 @@ int main(void)
   /* USER CODE BEGIN 2 */
   __HAL_UART_ENABLE_IT(&huart1, UART_IT_RXNE);
   __HAL_UART_ENABLE_IT(&huart1, UART_IT_TC);
+
+//  Init_PVD();
 
   EraseInitStruct.TypeErase = FLASH_TYPEERASE_PAGES;
   EraseInitStruct.PageAddress = USER_DATA_START_PAGE_ADDRESS;
@@ -380,6 +387,30 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 }
 
 ///=========================================================================
+/// @brief Function for initializing PVD for brownout handling
+///=========================================================================
+void Init_PVD()
+{
+    PWR_PVDTypeDef sConfigPVD;
+
+    sConfigPVD.PVDLevel = PWR_PVDLEVEL_7;
+    sConfigPVD.Mode = PWR_PVD_MODE_IT_RISING_FALLING;
+
+    HAL_PWR_ConfigPVD(&sConfigPVD);
+    HAL_PWR_EnablePVD();
+}
+
+///=========================================================================
+/// @brief Function for data saving after brownout detection
+///=========================================================================
+void HAL_PWR_PVDCallback()
+{
+    updateBuffer(flashBuffer);
+	FlashWriteData(USER_DATA_START_PAGE_ADDRESS, (uint32_t *)flashBuffer, 4);
+	HAL_UART_Transmit_IT(&huart1, messageBrownOUT, SENSOR_MESSAGE_SIZE);
+}
+
+///=========================================================================
 /// @brief Function for erasing specific data page in flash memory
 /// @return result (success == 0)
 ///=========================================================================
@@ -400,8 +431,8 @@ uint32_t FlashEraseData(FLASH_EraseInitTypeDef EraseInitStruct, uint32_t PageErr
 ///=========================================================================
 uint32_t FlashWriteData(uint32_t startPageAddress, uint32_t *data, uint16_t wordsNumber)
 {
-	HAL_FLASH_Unlock();
 	FlashEraseData(EraseInitStruct, PageError);
+	HAL_FLASH_Unlock();
     for (uint16_t count = 0; count < wordsNumber; count++)
     {
     	if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, startPageAddress, data[count]) == HAL_OK)
@@ -448,6 +479,7 @@ void ConvertToStr(uint32_t num1, uint32_t num2, uint8_t* buf)
         buf[i++] = rem + '0';
         num2 /= 10;
     }
+    buf[i++] = 32;
     while (num1 != 0)
 	  {
 		  rem = num1 % 10;
@@ -563,17 +595,17 @@ void StartIRSensor(void *argument)
       }
       sensor1State = GPIO_PIN_SET;
       sensor2State = GPIO_PIN_SET;
-      
-      if (flashBuffer[0] == USER_DATA_START_MAGIC_WORD &&
-          flashBuffer[3] == USER_DATA_END_MAGIC_WORD)
-      {
-        if (flashBuffer[1] % 10 == 0 || flashBuffer[2] % 10 == 0)
-        {
-          HAL_UART_Transmit_IT(&huart1, uartBuffer, sizeof(uartBuffer));
-        }
-      }
-
     }
+
+    FlashReadData(USER_DATA_START_PAGE_ADDRESS, flashBuffer, 4);
+    if (flashBuffer[0] == USER_DATA_START_KEYWORD &&
+        flashBuffer[3] == USER_DATA_END_KEYWORD && dataEvent == Saved)
+    {
+		ConvertToStr(flashBuffer[1], flashBuffer[2], uartBuffer);
+		HAL_UART_Transmit_IT(&huart1, uartBuffer, sizeof(uartBuffer));
+		dataEvent = Transmitted;
+    }
+
 	  osDelay(SENSOR_STATE_CHECK);
   }
   /* USER CODE END StartIRSensor */
@@ -590,8 +622,8 @@ void StartMemoryCheck(void *argument)
 {
   /* USER CODE BEGIN StartMemoryCheck */
   FlashReadData(USER_DATA_START_PAGE_ADDRESS, (uint32_t *)flashBuffer, 4);
-  if (flashBuffer[0] != USER_DATA_START_MAGIC_WORD ||
-      flashBuffer[3] != USER_DATA_END_MAGIC_WORD)
+  if (flashBuffer[0] != USER_DATA_START_KEYWORD ||
+      flashBuffer[3] != USER_DATA_END_KEYWORD)
   {
 	  FlashEraseData(EraseInitStruct, PageError);
 	  updateBuffer(flashBuffer);
@@ -608,13 +640,9 @@ void StartMemoryCheck(void *argument)
     updateBuffer(flashBuffer);
 	  FlashWriteData(USER_DATA_START_PAGE_ADDRESS, flashBuffer, 4);
     memset(flashBuffer, '\0', sizeof(flashBuffer));
+    dataEvent = Saved;
 
-	  if (peopleInCount != 0 && peopleInCount != 0)
-    {
-      FlashReadData(USER_DATA_START_PAGE_ADDRESS, flashBuffer, 4);
-     	ConvertToStr(flashBuffer[1], flashBuffer[2], uartBuffer);
-    }
-    osDelay(5000);
+    osDelay(FLASH_MEMORY_UPDATE_INTERVAL);
   }
   /* USER CODE END StartMemoryCheck */
 }

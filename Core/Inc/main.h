@@ -36,7 +36,7 @@ extern "C" {
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
-
+typedef enum {Saved = 0, Transmitted = 1} USER_DATA_EVENTS;
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
@@ -81,11 +81,12 @@ void Error_Handler(void);
 #define SENSOR_STATE_CHECK 100
 #define TRANSMISSION_TIMEOUT 1000
 #define WALKTHROUGH_INTERVAL 2000
+#define FLASH_MEMORY_UPDATE_INTERVAL 10000
 
 #define USER_DATA_START_PAGE_ADDRESS ((uint32_t)0x0800FC00)
 #define FLASH_MEMORY_WORD_SIZE 4
-#define USER_DATA_START_MAGIC_WORD 1
-#define USER_DATA_END_MAGIC_WORD 2
+#define USER_DATA_START_KEYWORD 1
+#define USER_DATA_END_KEYWORD 2
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
